@@ -27,26 +27,47 @@ Implementing gRPC on rust only facilitates method caling between client and serv
 ## In the MyPaymentService implementation, what additional steps might be necessary to handle more complex payment processing logic?
 
 **Here are some steps I woul consider if we were to actually have the PaymentService record and make payments:**
-
 First it would have to authenticate the user to see if they have the authority and the ability to make the payment
-
 I would also add some logic that would actually log/record the payment happening in a shared list of transactions, so instead of get_transaction_history getting 30 made up transactions, it will actually give 
-
 transactions made by making a payment.
-
 I would assume we also have a data structure storing the products or the users that we have, in which case the paymentService will have to update those too.
-
 Lastly, instead of just returning a response with only a success field, we should also have a field that describes why a payment is unsuccessful if success is false.
 
 
 **For all of these changes we would have to:**
-
 update the protoBuf struct for PaymentResponse
-
-Add a few shared stores of data (here we may use the Singleton pattern to do so)
-
+Add a few shared stores of data (here we may use the Singleton pattern to do so
 implement authentication on our services
-
 And lastly would just be adding the logic in the process_payment method to handle all of these new details, along with error handling when something goes wrong, as well as trying to make sure no concurrency issues occur while adding this logic, as process_payment is an asynchronous function that can exhibit issues when handled incorrectly
+
+## What impact does the adoption of gRPC as a communication protocol have on the overall architecture and design of distributed systems, particularly in terms of interoperability with other technologies and platforms?
+
+With the adoption of gRPC in a distributed system, this will allow each microservice of that system to be coded and developed independently using whatever language is the best for their use-case, while still allowing efficient and simple communication between microservices. The ability to develop independently comes from the fact that gRPC is language-agnostic(works with any language), allowing for standardised communication between microservices. This is also why it is specifically ideal for systems distributed over different technologies and platforms, since gRPC will provide an interface for all of the microservices that make up the system to interact with each other without having to heavily focus on how communication, serialisation nd deserialisation would have to work during development. Furthermore, if you are utilising services that you have not developed yourself (third-party), you can simply have an adapter that interacts with that other service, as well as the rest of the system using gRPC, thus acting as a link from the system we have established and the other service. It does this in an efficient manner due to taking advantage of HTTP/2's features such as multiplexed streams, header compression, server push etc. 
+
+## What are the advantages and disadvantages of using HTTP/2, the underlying protocol for gRPC, compared to HTTP/1.1 or HTTP/1.1 with WebSocket for REST APIs?
+
+The following are the advantages of HTTP/2:
+
+**Multiplexed streams:** This allows for multiple requests and responses to be sent and received in parallel, without having to open and close separate connections to handle multiple requests. This allow for persistent connections, thus making it so that we don't have to reestablish connection for every single message received/sent, thus allowing for established connections to not face as much latency, and even allows continuous streams of message sending/receiving to be viable. 
+
+**Header compression:** Header compression compresses the headers, so that the only information being sent by said headers are changes in the header fields (rather than having to send all header fields, most of which stays the same throughout a full interaction between client and server.
+
+**Server Push:** This allows for the server to send messages to a client, without requiring the client to make a request for it first. This allows for server streaming to be viable, because otherwise for the server to send a stream of messages, the client qould have to send a stream of requests, as opposed to only requiring one request to set up a stream with the server letting it know what the client wants from the server during it's interaction.
+
+**Stream Prioritisation:** allows the sender of a stream of messages to set the priority of each message to be sent to ensure that more information is sent and thus received by the client asap 
+
+The Following are the disadvantages:
+
+**Complexity:** implementing HTTP/2 and debugging the HTTP/2 is a lot more difficult than HTTP/1.1 due to the performance optimisations that HTTP/2 introduces. (this is more of a problem for the people who have to make the grpc packages and interfaces)
+
+**Potential Head of Line Blocking:** If the first message being sent is very large, the other smaller messages that need to be sent will end up being held up waiting for the larger message to be successfully sent and ACKed, despite the fact that the smaller messages may take mere miliseconds to be sent if not less. (this is also a problem in HTTP/1.1 though)
+
+**Overhead costs and challenges:** Firstly, you may run into resource consumption issues due to the fact that HTTP/2 would be opening and handling many streams at a time, which if configured improperly will leave you vulnerable to possible attacks that aim to crash your servers. The other challenge we may face is the fact that HTTP/2 was only introduced in 2015 so there is legacy infrastructure and frameworks that would need to be updated for it to work properly with HTTP/2
+
+Comparisons:
+
+**Comparison with HTTP/1.1:** HTTP/2 is a major improvement on HTTP/1.1 since it alliows persistent connections to occur with multiple sources, allowing it to handle more message receiving and sending at a time, as well as reducing latency of subsequent communication and making client, server and bi-directional streaming that gRPC has to be viable. This makes real-time notifications and sending of large or many data at a time a lot more easier and efficient. However you do have the tradeoff of HTTP/2's inherent complexity and the fact that legacy infrastructure can't use HTTP/2
+
+**Comparison with HTTP/1.1 with Websocket:** ALthough websockets will allow for streaming tio occur as they open a bidirectional channel of communication, similar to HTTP/2, however HTTP/2 is generally still better due to the features in efficiency and convenience it provides. For example Header Compression increases efficiency and throughput massively, due to the fact that HTTP/2 messages take up less space or has more space for larger payloads, since the header takes a lot less space than HTTP/1.1. Server Push allows for easier continuous transmission from server to client, as it removes th necessity of a Request being received to send data. Stream Prioritisation allows you to prioritise essential information first which will be handled by HTTP/2, whereas HTTP/1.1 would require you to hard code such behaviour. Overall, although HTTP/1.1 does allow 2-way conversation, it lacks many features that gRPC utilises fully to be as efficient and convenient as possible, once HTTP/2 is set up. 
 
 ## 
